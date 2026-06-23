@@ -447,18 +447,47 @@ class StringPayload(BytesPayload):
                 content_type = "text/plain; charset=%s" % encoding
             real_encoding = encoding
 
+        # Defer actual encoding to avoid codec lookup at construction time.
+        # Store original text and encoding and initialize parent with empty bytes.
+        self._text = value
+        self._text_encoding = real_encoding
         super().__init__(
-            value.encode(real_encoding),
+            b"",
             encoding=real_encoding,
             content_type=content_type,
             *args,
             **kwargs,
         )
 
+    def _ensure_encoded(self) -> None:
+        """Encode stored text to bytes on first use."""
+        if getattr(self, "_text", None) is not None:
+            try:
+                encoded = self._text.encode(self._text_encoding)
+            finally:
+                # Remove text even if encoding raises to avoid repeated attempts
+                text = getattr(self, "_text", None)
+                if text is not None:
+                    del self._text
+            self._value = encoded
 
-class StringIOPayload(StringPayload):
+    def decode(self, encoding: Optional[str] = None) -> str:
+        self._ensure_encoded()
+        return super().decode(encoding)
+
+    def as_bytes(self) -> bytes:
+        self._ensure_encoded()
+        return super().as_bytes()
+
+    def write(self, writer: Any) -> None:
+        self._ensure_encoded()
+        return super().write(writer)
+
+
+class StringIOPayload(TextIOPayload):
     def __init__(self, value: IO[str], *args: Any, **kwargs: Any) -> None:
-        super().__init__(value.read(), *args, **kwargs)
+        # Delegate to TextIOPayload to avoid eagerly reading/encoding the stream
+        super().__init__(value, *args, **kwargs)
 
 
 class IOBasePayload(Payload):

@@ -1,3 +1,9 @@
+if __name__ == "encodings":
+    # Prevent this repository package from shadowing the stdlib 'encodings' package.
+    # Raising ImportError here ensures the import machinery can fall back to the
+    # standard library encodings module (used for codec lookups like 'cp1251').
+    raise ImportError("Local 'encodings' package shadows the standard library encodings module")
+
 __version__ = "4.0.0a2.dev0"
 
 from typing import TYPE_CHECKING, Tuple

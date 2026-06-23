@@ -12,7 +12,7 @@ class BaseProtocol(asyncio.Protocol):
         "_paused",
         "_drain_waiter",
         "_connection_lost",
-        "_reading_paused",
+        "_reading_paused_base",
         "transport",
     )
 
@@ -20,7 +20,7 @@ class BaseProtocol(asyncio.Protocol):
         self._loop: asyncio.AbstractEventLoop = loop
         self._paused = False
         self._drain_waiter: asyncio.Future[None] | None = None
-        self._reading_paused = False
+        self._reading_paused_base = False
 
         self.transport: asyncio.Transport | None = None
 
@@ -48,20 +48,20 @@ class BaseProtocol(asyncio.Protocol):
                 waiter.set_result(None)
 
     def pause_reading(self) -> None:
-        if not self._reading_paused and self.transport is not None:
+        if not self._reading_paused_base and self.transport is not None:
             try:
                 self.transport.pause_reading()
             except (AttributeError, NotImplementedError, RuntimeError):
                 pass
-            self._reading_paused = True
+            self._reading_paused_base = True
 
     def resume_reading(self) -> None:
-        if self._reading_paused and self.transport is not None:
+        if self._reading_paused_base and self.transport is not None:
             try:
                 self.transport.resume_reading()
             except (AttributeError, NotImplementedError, RuntimeError):
                 pass
-            self._reading_paused = False
+            self._reading_paused_base = False
 
     def connection_made(self, transport: asyncio.BaseTransport) -> None:
         tr = cast(asyncio.Transport, transport)

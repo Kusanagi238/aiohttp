@@ -1,5 +1,8 @@
 import warnings
-from typing import Any, Dict, Iterable, List, Optional, Set  # noqa
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from typing import Any, Dict, Iterable, List, Optional, Set  # noqa
 
 from yarl import URL
 

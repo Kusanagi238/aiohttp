@@ -19,6 +19,12 @@ import pytest
 from pytest_mock import MockerFixture
 from yarl import URL
 
+import builtins
+
+# Ensure TYPE_CHECKING is defined in builtins so modules that mistakenly
+# reference TYPE_CHECKING at import-time do not raise NameError during test collection.
+builtins.TYPE_CHECKING = False
+
 import aiohttp
 from aiohttp import (
     ClientRequest,

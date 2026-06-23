@@ -35,6 +35,14 @@ from aiohttp.helpers import TimerNoop
 from aiohttp.http import WS_KEY, HttpVersion11
 from aiohttp.test_utils import get_unused_port_socket, loop_context
 
+# Ensure TYPE_CHECKING is available in builtins to avoid NameError in
+# modules that mistakenly reference TYPE_CHECKING without importing it.
+# Some test import chains import aiohttp.web_app during collection; that
+# module may refer to TYPE_CHECKING at import time in some versions.
+import builtins
+from typing import TYPE_CHECKING
+builtins.TYPE_CHECKING = TYPE_CHECKING
+
 try:
     import trustme
 
@@ -332,7 +340,7 @@ def netrc_other_host(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
 @pytest.fixture
 def start_connection() -> Iterator[mock.Mock]:
     with mock.patch(
-        "aiohttp.connector.aiohappyeyeballs.start_connection",
+        "aiohttp.connector.start_connection",
         autospec=True,
         spec_set=True,
         return_value=mock.create_autospec(socket.socket, spec_set=True, instance=True),

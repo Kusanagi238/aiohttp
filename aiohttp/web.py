@@ -8,13 +8,19 @@ from argparse import ArgumentParser
 from collections.abc import Awaitable, Callable, Iterable, Iterable as TypingIterable
 from contextlib import suppress
 from importlib import import_module
-from typing import Any, cast
+from typing import Any, cast, TYPE_CHECKING
 
 from .abc import AbstractAccessLogger
 from .helpers import AppKey
 from .log import access_logger
 from .typedefs import PathLike
-from .web_app import Application, CleanupError
+if TYPE_CHECKING:
+    from .web_app import Application, CleanupError
+else:
+    # At runtime avoid importing web_app to prevent import-time side effects
+    # Provide safe fallbacks for names used only for annotations or exception handling
+    Application = Any  # type: ignore
+    CleanupError = Exception  # type: ignore
 from .web_exceptions import (
     HTTPAccepted,
     HTTPBadGateway,

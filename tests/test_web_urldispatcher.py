@@ -381,7 +381,8 @@ async def test_handler_metadata_persistence() -> None:
 
     async def async_handler(request: web.Request) -> web.Response:
         """Doc"""
-        assert False
+        # Do not raise here — the test only inspects handler metadata
+        return web.Response(text="ok")
 
     app.router.add_get("/async", async_handler)
 

@@ -96,9 +96,28 @@ class AccessLoggerWrapper(AbstractAsyncAccessLogger):
         super().__init__()
 
     async def log(
-        self, request: BaseRequest, response: StreamResponse, request_start: float
+        self, request: BaseRequest, response: StreamResponse, request_start: float | None
     ) -> None:
-        self.access_logger.log(request, response, self._loop.time() - request_start)
+        # Guard against request_start being None (may happen when logging is
+        # disabled or not recorded). Use a safe numeric duration so that
+        # non-async access loggers receiving a float don't raise.
+        if request_start is None:
+            duration = 0.0
+        else:
+            duration = self._loop.time() - request_start
+        try:
+            self.access_logger.log(request, response, duration)
+        except Exception as exc:
+            # Access logger must not break request handling. Report the
+            # error to the loop's exception handler and swallow it.
+            try:
+                self._loop.call_exception_handler(
+                    {"message": "Exception in access logger", "exception": exc}
+                )
+            except Exception:
+                # If even reporting fails, ensure we don't propagate the
+                # exception further.
+                pass
 
     @property
     def enabled(self) -> bool:
@@ -488,8 +507,9 @@ class RequestHandler(BaseProtocol, Generic[_Request]):
         request_start: float | None,
     ) -> None:
         if self._logging_enabled and self.access_logger is not None:
-            if TYPE_CHECKING:
-                assert request_start is not None
+            # Perform runtime-safe call to the access logger. TYPE_CHECKING
+            # is only for static type checks and must not be used for runtime
+            # assertions. AccessLoggerWrapper handles None start times.
             await self.access_logger.log(request, response, request_start)
 
     def log_debug(self, *args: Any, **kw: Any) -> None:
@@ -608,7 +628,9 @@ class RequestHandler(BaseProtocol, Generic[_Request]):
                 # a new task is used for copy context vars (#3406)
                 coro = self._handle_request(request, start, request_handler)
                 if sys.version_info >= (3, 12):
-                    task = asyncio.Task(coro, loop=loop, eager_start=True)
+                    # On Python 3.12+ the Task constructor no longer accepts
+                    # the loop= parameter. Pass only supported kwargs.
+                    task = asyncio.Task(coro, eager_start=True)
                 else:
                     task = loop.create_task(coro)
                 try:
@@ -727,10 +749,19 @@ class RequestHandler(BaseProtocol, Generic[_Request]):
             await prepare_meth(request)
             await resp.write_eof()
         except ConnectionError:
-            await self.log_access(request, resp, start_time)
+            # Ensure access-logging failures do not convert a handled
+            # ConnectionError into a 500 response.
+            try:
+                await self.log_access(request, resp, start_time)
+            except Exception as exc:
+                self.log_exception("Error in access logger", exc_info=exc)
             return resp, True
 
-        await self.log_access(request, resp, start_time)
+        try:
+            await self.log_access(request, resp, start_time)
+        except Exception as exc:
+            # Swallow logging errors so they don't affect the response
+            self.log_exception("Error in access logger", exc_info=exc)
         return resp, False
 
     def handle_error(

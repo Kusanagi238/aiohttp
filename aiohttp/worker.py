@@ -9,8 +9,19 @@ import sys
 from types import FrameType
 from typing import TYPE_CHECKING, Any, Optional
 
-from gunicorn.config import AccessLogFormat as GunicornAccessLogFormat
-from gunicorn.workers import base
+# Defer importing gunicorn at module import time to avoid pulling in
+# platform-specific dependencies (like `grp`) on platforms such as Windows.
+# Allow static type checkers to see the names via TYPE_CHECKING.
+if TYPE_CHECKING:
+    from gunicorn.config import AccessLogFormat as GunicornAccessLogFormat
+    from gunicorn.workers import base  # type: ignore
+else:
+    try:
+        from gunicorn.config import AccessLogFormat as GunicornAccessLogFormat
+        from gunicorn.workers import base
+    except Exception:  # pragma: no cover - avoid import-time failures on some platforms
+        GunicornAccessLogFormat = None  # type: ignore
+        base = None  # type: ignore
 
 from aiohttp import web
 

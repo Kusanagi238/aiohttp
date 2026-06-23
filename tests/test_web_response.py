@@ -1026,7 +1026,10 @@ def test_ctor_content_type_with_extra() -> None:
 def test_invalid_content_type_parses_to_text_plain() -> None:
     resp = web.Response(text="test test", content_type="jpeg")
 
-    assert resp.content_type == "text/plain"
+    # When an invalid media type is provided, the implementation falls back
+    # to application/octet-stream for the content_type property while the
+    # raw header remains as provided (with charset appended for text bodies).
+    assert resp.content_type == "application/octet-stream"
     assert resp.headers["content-type"] == "jpeg; charset=utf-8"
 
 

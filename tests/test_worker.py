@@ -14,7 +14,27 @@ from aiohttp import web
 if TYPE_CHECKING:
     from aiohttp import worker as base_worker
 else:
-    base_worker = pytest.importorskip("aiohttp.worker")
+    # Try to import aiohttp.worker directly. On some platforms (e.g. Windows)
+    # importing aiohttp.worker may fail because of a missing UNIX-only
+    # module like 'grp'. Attempt to provide a minimal dummy 'grp' module
+    # and re-import before falling back to pytest.importorskip so that tests
+    # are not skipped at collection time when the import can be satisfied.
+    import importlib
+    import sys
+    import types
+
+    try:
+        base_worker = importlib.import_module("aiohttp.worker")
+    except Exception:
+        # Provide a minimal dummy 'grp' module if it's missing, which can
+        # help importing aiohttp.worker on non-UNIX platforms.
+        if "grp" not in sys.modules:
+            sys.modules["grp"] = types.ModuleType("grp")
+        try:
+            base_worker = importlib.import_module("aiohttp.worker")
+        except Exception:
+            # If import still fails, skip the tests (preserve previous behavior).
+            base_worker = pytest.importorskip("aiohttp.worker")
 
 
 try:
